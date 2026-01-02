@@ -1,0 +1,26 @@
+✓ Step 1: pytesseract Python package - INSTALLED!
+
+⚠ Step 2: Tesseract OCR Engine - NEEDS TO BE INSTALLED
+
+To install Tesseract OCR:
+
+1. Download the installer:
+   https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe
+
+   Or go to: https://github.com/UB-Mannheim/tesseract/wiki
+   And download the latest "tesseract-ocr-w64-setup" file
+
+2. Run the installer
+   - Use default installation path: C:\Program Files\Tesseract-OCR
+   - Click through with default settings
+
+3. Restart your backend server
+   - Press Ctrl+C in the backend terminal
+   - Run: python start_server.py
+   - Should see: "✓ Receipt OCR features enabled"
+
+4. Test the receipt scanner in the app!
+
+Note: The installation is quick (about 1 minute) and the software is free and safe.
+
+
