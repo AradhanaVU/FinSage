@@ -21,7 +21,7 @@ An intelligent financial assistant platform with AI-powered insights, forecastin
 - **FastAPI**: Modern Python web framework
 - **SQLAlchemy**: Database ORM
 - **spaCy**: NLP for transaction categorization
-- **OpenAI API**: LLM for financial coaching chat
+- **OpenAI API / GEMINI API**: LLM for financial coaching chat
 - **NumPy/Pandas**: Data analysis and forecasting
 - **Monte Carlo**: Investment simulations
 
