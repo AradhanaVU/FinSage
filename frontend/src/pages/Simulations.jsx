@@ -209,7 +209,7 @@ export default function Simulations() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Goal Scenario Simulation</h2>
           <p className="text-gray-600 mb-6">
-            See how reducing spending in different categories affects your goal timeline
+            Monthly surplus is income minus expenses over your recent history, not a fixed $500 assumption. Reductions add to that surplus.
           </p>
 
           <div className="space-y-4">
@@ -300,6 +300,11 @@ export default function Simulations() {
                     </div>
                   </div>
                 ))}
+                {scenarioResult.observed_monthly_surplus != null && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    Observed monthly surplus used: ${Number(scenarioResult.observed_monthly_surplus).toFixed(2)}
+                  </p>
+                )}
                 {scenarioResult.time_saved_days > 0 && (
                   <p className="text-sm text-green-600 mt-2">
                     You could reach your goal {scenarioResult.time_saved_days} days faster!
@@ -440,7 +445,12 @@ export default function Simulations() {
                 </div>
               </div>
               <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
-                <div className="text-sm text-gray-600">Success Probability (2x return)</div>
+                <div className="text-sm text-gray-600">
+                  Chance of beating cash (no investment return)
+                  {monteCarloResult.cash_path_value != null && (
+                    <span> — cash path ${Number(monteCarloResult.cash_path_value).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  )}
+                </div>
                 <div className="text-2xl font-bold text-blue-600">
                   {(monteCarloResult.success_probability * 100).toFixed(1)}%
                 </div>

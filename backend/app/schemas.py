@@ -17,6 +17,15 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class LoginRequest(BaseModel):
+    username: str  # email or username
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
 # Transaction schemas
 class TransactionBase(BaseModel):
     amount: float
@@ -26,7 +35,28 @@ class TransactionBase(BaseModel):
     merchant: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
-    pass
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+
+class TransactionUpdate(BaseModel):
+    amount: Optional[float] = None
+    description: Optional[str] = None
+    date: Optional[datetime] = None
+    transaction_type: Optional[str] = None
+    merchant: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+
+class TransactionCategoryUpdate(BaseModel):
+    category: str
+    subcategory: Optional[str] = None
+
+class CategorySuggestion(BaseModel):
+    category: str
+    subcategory: Optional[str] = None
+    confidence: float
+    probabilities: Dict[str, float] = {}
+    matched_phrases: List[str] = []
 
 class TransactionResponse(TransactionBase):
     id: int
@@ -111,13 +141,24 @@ class ScenarioSimulation(BaseModel):
     time_to_goal: Optional[int] = None  # days
     savings_impact: float
 
+class MonteCarloRequest(BaseModel):
+    initial_investment: float
+    monthly_contribution: float
+    years: int
+    expected_return: float = 0.07
+    volatility: float = 0.15
+    simulations: int = 1000
+
 class MonteCarloResult(BaseModel):
     simulations: int
     mean_outcome: float
     median_outcome: float
     percentile_5: float
     percentile_95: float
+    percentile_25: float = 0.0
+    percentile_75: float = 0.0
     success_probability: float
+    cash_path_value: float = 0.0
 
 class OpportunityCost(BaseModel):
     spending_amount: float

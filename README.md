@@ -56,16 +56,20 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-5. Create a `.env` file in the backend directory:
-```env
-DATABASE_URL=sqlite:///./finance_app.db
-SECRET_KEY=your-secret-key-here
-OPENAI_API_KEY=your-openai-api-key-here  # Optional: Chat features work with fallback if not provided
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+5. Copy env example and edit secrets:
+```bash
+cp .env.example .env
 ```
 
-**Note**: The OpenAI API key is optional. The chat feature will work with a fallback response system if no API key is provided. However, for the best experience with the AI Financial Coach, provide your OpenAI API key.
+Required values:
+```env
+DATABASE_URL=sqlite:///./finance_app.db
+SECRET_KEY=your-long-random-secret
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+ENV=development
+GEMINI_API_KEY=   # optional
+OPENAI_API_KEY=   # optional
+```
 
 6. Run the backend server:
 ```bash
@@ -86,86 +90,83 @@ cd frontend
 npm install
 ```
 
-3. Run the development server:
+3. Copy env example (points API at local backend):
+```bash
+cp .env.example .env
+```
+
+4. Run the development server:
 ```bash
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000`
+Open `http://localhost:3000`, register an account, then sign in. Each user only sees their own data.
+
+## Docker Compose (multi-user production-like)
+
+From the repo root:
+
+```bash
+# Optional: export SECRET_KEY and GEMINI_API_KEY
+docker compose up --build
+```
+
+- App: `http://localhost:3000` (nginx proxies `/api` to the API)
+- API direct: `http://localhost:8000`
+- Postgres: internal `db:5432`
+
+On startup the API runs `alembic upgrade head`. Set a strong `SECRET_KEY` before any real deploy.
 
 ## API Documentation
 
-Once the backend is running, visit `http://localhost:8000/docs` for interactive API documentation.
+In development, visit `http://localhost:8000/docs`. Docs are disabled when `ENV=production`.
+
+## Auth
+
+- `POST /api/auth/register` — create account
+- `POST /api/auth/login` — OAuth2 form (Swagger)
+- `POST /api/auth/login/json` — JSON login for the SPA
+- `GET /api/auth/me` — current user (Bearer token)
+
+All finance endpoints require `Authorization: Bearer <token>`.
 
 ## Project Structure
 
 ```
 .
+├── docker-compose.yml
 ├── backend/
+│   ├── alembic/
 │   ├── app/
-│   │   ├── ai/              # AI modules
-│   │   │   ├── categorizer.py
-│   │   │   ├── pattern_detector.py
-│   │   │   ├── forecaster.py
-│   │   │   ├── llm_chat.py
-│   │   │   ├── simulations.py
-│   │   │   └── alert_generator.py
-│   │   ├── routers/         # API endpoints
-│   │   │   ├── transactions.py
-│   │   │   ├── goals.py
-│   │   │   ├── ai_insights.py
-│   │   │   ├── chat.py
-│   │   │   ├── alerts.py
-│   │   │   ├── simulations.py
-│   │   │   └── receipts.py
-│   │   ├── database.py
-│   │   ├── models.py
-│   │   ├── schemas.py
+│   │   ├── core/            # settings + JWT/password helpers
+│   │   ├── ai/
+│   │   ├── routers/         # includes auth.py
+│   │   ├── deps.py          # get_current_user
 │   │   └── main.py
-│   └── requirements.txt
+│   ├── Dockerfile
+│   └── .env.example
 ├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── App.jsx
-│   └── package.json
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── src/
+│       ├── pages/Login.jsx, Register.jsx
+│       └── services/auth.jsx, api.js
 └── README.md
 ```
 
 ## Usage Examples
 
 ### Adding Transactions
-Transactions are automatically categorized using AI. Simply add a transaction with a description, and the system will:
-- Categorize it based on merchant/description
-- Assign a confidence score
-- Detect patterns and anomalies
+After login, transactions are categorized with AI. You can override categories manually; labels stay private to your account.
 
 ### Setting Goals
-Create financial goals and use scenario simulations to see how spending reductions can help you reach goals faster.
+Create goals and run spending-reduction scenarios against your own surplus.
 
 ### AI Chat
 Ask questions like:
 - "How can I save $500 this month?"
 - "Am I on track for retirement?"
 - "What's my biggest spending category?"
-
-### Insights
-View:
-- Spending analysis by category
-- 30-day spending forecasts
-- Detected anomalies
-- Spending patterns
-
-## Future Enhancements
-
-- User authentication and multi-user support
-- Bank account integration
-- Advanced receipt OCR with better parsing
-- More sophisticated forecasting models
-- Investment portfolio tracking
-- Budget templates and recommendations
-- Export reports (PDF, CSV)
 
 ## License
 

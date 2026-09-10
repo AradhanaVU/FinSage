@@ -41,24 +41,25 @@ export default function Dashboard() {
       setLoading(true)
       
       // Get transactions
-      const txnResponse = await getTransactions({ limit: 10 })
+      const txnResponse = await getTransactions({ limit: 1000 })
       const transactions = txnResponse.data
-      
-      // Calculate stats
+
+      // Cash identity: Income I, Expenses E, Balance B = I - E.
+      // Amounts are stored signed, so always take magnitude by type.
       const income = transactions
         .filter(t => t.transaction_type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0)
-      
+        .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0)
+
       const expenses = transactions
         .filter(t => t.transaction_type === 'expense')
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+        .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0)
       
       // Get goals
       const goalsResponse = await getGoals()
       const goals = goalsResponse.data
-      const totalProgress = goals.reduce((sum, g) => {
-        return sum + (g.current_amount / g.target_amount) * 100
-      }, 0) / (goals.length || 1)
+      const funded = goals.reduce((sum, g) => sum + Math.max(0, Number(g.current_amount) || 0), 0)
+      const targeted = goals.reduce((sum, g) => sum + Math.max(0, Number(g.target_amount) || 0), 0)
+      const totalProgress = targeted > 0 ? (funded / targeted) * 100 : 0
       
       // Get alerts
       const alertsResponse = await getAlerts(true)
@@ -96,7 +97,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Overview of your financial health</p>
+        <p className="text-gray-600 mt-1">Income minus expenses across all loaded transactions</p>
       </div>
 
       {/* Stats Cards */}

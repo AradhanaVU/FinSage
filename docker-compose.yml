@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: finsage
+      POSTGRES_PASSWORD: finsage
+      POSTGRES_DB: finsage
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finsage -d finsage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+psycopg2://finsage:finsage@db:5432/finsage
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-openssl-rand}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ""
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:

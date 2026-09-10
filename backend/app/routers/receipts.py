@@ -7,6 +7,7 @@ from PIL import Image
 from app.database import get_db
 from app import models, schemas
 from app.ai.categorizer import TransactionCategorizer
+from app.deps import get_current_user
 from datetime import datetime
 
 # Make pytesseract optional
@@ -40,7 +41,8 @@ categorizer = TransactionCategorizer()
 @router.post("/upload")
 async def upload_receipt(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Upload a receipt and extract transaction data."""
     if not HAS_PYTESSERACT:
@@ -447,7 +449,7 @@ async def upload_receipt(
             date=receipt_date,
             ai_categorized=True,
             confidence_score=confidence,
-            user_id=1  # TODO: Auth
+            user_id=current_user.id
         )
         
         db.add(db_transaction)
@@ -470,10 +472,13 @@ async def upload_receipt(
         raise HTTPException(status_code=500, detail=f"Error processing receipt: {str(e)}")
 
 @router.get("/subscriptions")
-async def detect_subscriptions(db: Session = Depends(get_db)):
+async def detect_subscriptions(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """Detect recurring subscriptions from transactions."""
     transactions = db.query(models.Transaction).filter(
-        models.Transaction.user_id == 1,  # TODO: Auth
+        models.Transaction.user_id == current_user.id,
         models.Transaction.transaction_type == "expense"
     ).all()
     

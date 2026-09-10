@@ -140,7 +140,7 @@ export default function RiskAnalysis() {
               {severity.label} Risk
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-2">P(cash flow &lt; 0)</p>
+          <p className="text-xs text-gray-500 mt-2">P(net cash flow over the horizon &lt; 0)</p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
@@ -173,7 +173,7 @@ export default function RiskAnalysis() {
           <div className="text-3xl font-bold text-purple-600">
             {riskData.runway_days > 0 ? Math.round(riskData.runway_days) : 0}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Days until expected failure</p>
+          <p className="text-xs text-gray-500 mt-2">Safety margin: (μ / σ) × 30 days</p>
         </div>
       </div>
 
@@ -327,18 +327,26 @@ export default function RiskAnalysis() {
           Stress Testing
         </h2>
         <p className="text-sm text-gray-600 mb-4">
-          Apply shocks to see how risk changes (e.g., rent +10%, income -10%)
+          Scale a real category (or Income) and recompute P(S_T &lt; 0)
         </p>
 
         <div className="space-y-4">
           {/* Add Scenario */}
           <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-            <input
-              type="text"
-              placeholder="Category (e.g., rent, income, dining)"
+            <select
               id="stressCategory"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            />
+              defaultValue=""
+            >
+              <option value="" disabled>Select a category</option>
+              <option value="Income">Income</option>
+              {(riskData.expense_stats?.category_stats
+                ? Object.keys(riskData.expense_stats.category_stats)
+                : riskData.risk_drivers.map((d) => d.category)
+              ).filter((name) => name !== 'Income').map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
             <input
               type="number"
               step="0.1"
@@ -453,18 +461,3 @@ export default function RiskAnalysis() {
           <div>
             <div className="text-gray-600">Expense Mean</div>
             <div className="font-semibold text-gray-900">
-              ${riskData.expense_stats?.total_mean?.toFixed(2) || '0.00'}
-            </div>
-          </div>
-          <div>
-            <div className="text-gray-600">Expense Std Dev</div>
-            <div className="font-semibold text-gray-900">
-              ${riskData.expense_stats?.total_std?.toFixed(2) || '0.00'}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
