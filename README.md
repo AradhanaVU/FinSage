@@ -117,6 +117,60 @@ docker compose up --build
 
 On startup the API runs `alembic upgrade head`. Set a strong `SECRET_KEY` before any real deploy.
 
+## Deploy on Railway
+
+You need **three** services from the same GitHub repo: Postgres, API, Web.
+
+### 1. Postgres
+- New Project → **Add Postgres** (plugin).
+
+### 2. API service
+- **New Service** → GitHub repo → **Root Directory** = `backend`
+- It will use `backend/Dockerfile` + `backend/railway.toml`
+- Variables:
+
+```bash
+ENV=production
+PORT=8000
+SECRET_KEY=<openssl rand -hex 32>
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+CORS_ORIGINS=https://<your-web-domain>.up.railway.app
+GEMINI_API_KEY=<optional>
+```
+
+- Networking → **Generate domain** (public API URL; optional if web proxies privately).
+
+`DATABASE_URL` from Railway (`postgresql://…`) is auto-normalized to `postgresql+psycopg2://…`. Migrations run on boot.
+
+### 3. Web service
+- **New Service** → same repo → **Root Directory** = `frontend`
+- Name the API service `api` (or update `API_UPSTREAM` to match)
+- Variables:
+
+```bash
+PORT=80
+API_UPSTREAM=${{api.RAILWAY_PRIVATE_DOMAIN}}:${{api.PORT}}
+```
+
+- Leave build arg `VITE_API_URL` empty so the SPA calls same-origin `/api` (nginx proxies to the API over Railway private networking).
+- Networking → **Generate domain** — this is the URL users open.
+- Put that exact HTTPS origin into the API’s `CORS_ORIGINS`.
+
+### 4. Verify
+1. Open the **web** domain → Register → Sign in  
+2. Add a transaction, open Risk Analysis / AI Coach  
+3. `https://<api-domain>/api/health` should return OK if you exposed the API  
+
+**Alternative (no private proxy):** build web with `VITE_API_URL=https://<api-domain>` and set `CORS_ORIGINS` to the web domain. Then nginx does not need to reach the API.
+
+### Local Docker still works
+
+```bash
+docker compose up --build
+```
+
+App: `http://localhost:3000` (nginx → `api:8000`).
+
 ## API Documentation
 
 In development, visit `http://localhost:8000/docs`. Docs are disabled when `ENV=production`.

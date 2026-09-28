@@ -83,3 +83,20 @@ def login_json(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.UserResponse)
 def me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/stats")
+def user_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Return how many registered accounts exist (any signed-in user can view)."""
+    total = db.query(models.User).count()
+    return {
+        "total_users": total,
+        "you": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+        },
+    }

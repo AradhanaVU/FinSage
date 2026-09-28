@@ -151,7 +151,10 @@ export default function RiskAnalysis() {
           <div className="text-3xl font-bold text-orange-600">
             ${Math.abs(riskData.expected_shortfall).toFixed(2)}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Tail risk when failure occurs</p>
+          <p className="text-xs text-gray-500 mt-2">
+            Avg size of a loss <span className="whitespace-nowrap">if</span> cash flow goes negative
+            (not your typical month)
+          </p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
@@ -190,41 +193,51 @@ export default function RiskAnalysis() {
         {riskData.risk_drivers.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Pie Chart */}
-            <div>
+            <div className="min-w-0 overflow-visible">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Risk Contribution (%)</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={riskDriversData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {riskDriversData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="w-full h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 24, right: 24, bottom: 24, left: 24 }}>
+                    <Pie
+                      data={riskDriversData}
+                      cx="50%"
+                      cy="48%"
+                      labelLine
+                      label={({ name, value }) => `${name} ${value.toFixed(0)}%`}
+                      outerRadius={88}
+                      fill="#8884d8"
+                      dataKey="value"
+                      paddingAngle={1}
+                    >
+                      {riskDriversData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Risk share']} />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value) => <span className="text-xs text-gray-700">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Bar Chart */}
-            <div>
+            <div className="min-w-0">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Risk Share by Category</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={riskDriversData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="w-full h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={riskDriversData} margin={{ top: 8, right: 8, bottom: 48, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Risk share']} />
+                    <Bar dataKey="value" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         ) : (
@@ -461,3 +474,17 @@ export default function RiskAnalysis() {
           <div>
             <div className="text-gray-600">Expense Mean</div>
             <div className="font-semibold text-gray-900">
+              ${riskData.expense_stats?.total_mean?.toFixed(2) || '0.00'}
+            </div>
+          </div>
+          <div>
+            <div className="text-gray-600">Expense Std Dev</div>
+            <div className="font-semibold text-gray-900">
+              ${riskData.expense_stats?.total_std?.toFixed(2) || '0.00'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

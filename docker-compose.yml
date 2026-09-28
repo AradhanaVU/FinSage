@@ -35,6 +35,9 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ""
+    environment:
+      PORT: "80"
+      API_UPSTREAM: api:8000
     depends_on:
       - api
     ports:

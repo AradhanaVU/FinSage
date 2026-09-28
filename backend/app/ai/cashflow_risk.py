@@ -122,7 +122,10 @@ class CashFlowRiskAnalyzer:
 
         first, last = dated[0][0], dated[-1][0]
         span_days = max(1, (last - first).days + 1)
-        scale = 30.0 / span_days
+        # Never inflate a short window into a fake high monthly rate.
+        # $1000 on one day is ~$1000/month, not $30,000/month.
+        effective_days = max(span_days, 30)
+        scale = 30.0 / effective_days
 
         weekly_income: Dict[Tuple[int, int], float] = defaultdict(float)
         weekly_expense: Dict[Tuple[int, int], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
@@ -151,32 +154,52 @@ class CashFlowRiskAnalyzer:
             cursor += timedelta(days=7)
         week_keys = sorted(set(week_keys))
         n_weeks = max(1, len(week_keys))
+        # Weekly→monthly conversion is only trustworthy with enough weeks.
+        use_weekly = n_weeks >= 4 and span_days >= 28
 
         income_weeks = [weekly_income.get(k, 0.0) for k in week_keys]
-        mean_weekly_income = sum(income_weeks) / n_weeks
-        var_weekly_income = self._sample_variance(income_weeks, mean_weekly_income, mean_weekly_income)
+        rate_income = total_income * scale
+        if use_weekly:
+            mean_weekly_income = sum(income_weeks) / n_weeks
+            var_weekly_income = self._sample_variance(
+                income_weeks, mean_weekly_income, mean_weekly_income
+            )
+            income_mean = 0.5 * (mean_weekly_income * WEEKS_PER_MONTH) + 0.5 * rate_income
+            income_var = var_weekly_income * WEEKS_PER_MONTH
+        else:
+            income_mean = rate_income
+            income_var = self._sample_variance(
+                [rate_income] if income_count else [],
+                income_mean,
+                income_mean,
+            )
 
         income_stats = {
-            "mean": mean_weekly_income * WEEKS_PER_MONTH,
-            "variance": var_weekly_income * WEEKS_PER_MONTH,
-            "std": math.sqrt(max(0.0, var_weekly_income * WEEKS_PER_MONTH)),
+            "mean": income_mean,
+            "variance": income_var,
+            "std": math.sqrt(max(0.0, income_var)),
             "count": float(income_count),
             "sample_days": float(span_days),
         }
-        # Rate-based mean is more stable than sparse weekly averages when
-        # activity is clustered. Blend toward the calendar rate.
-        rate_income = total_income * scale
-        income_stats["mean"] = 0.5 * income_stats["mean"] + 0.5 * rate_income
 
         category_stats = {}
         total_mean = 0.0
         total_variance = 0.0
         for category, total in category_totals.items():
             weeks = [weekly_expense[k].get(category, 0.0) for k in week_keys]
-            mean_weekly = sum(weeks) / n_weeks
-            var_weekly = self._sample_variance(weeks, mean_weekly, mean_weekly)
-            mean_month = 0.5 * (mean_weekly * WEEKS_PER_MONTH) + 0.5 * (total * scale)
-            var_month = var_weekly * WEEKS_PER_MONTH
+            rate_month = total * scale
+            if use_weekly:
+                mean_weekly = sum(weeks) / n_weeks
+                var_weekly = self._sample_variance(weeks, mean_weekly, mean_weekly)
+                mean_month = 0.5 * (mean_weekly * WEEKS_PER_MONTH) + 0.5 * rate_month
+                var_month = var_weekly * WEEKS_PER_MONTH
+            else:
+                mean_month = rate_month
+                var_month = self._sample_variance(
+                    [rate_month] if total > 0 else [],
+                    mean_month,
+                    mean_month,
+                )
             std_month = math.sqrt(max(0.0, var_month))
             category_stats[category] = {
                 "mean": mean_month,

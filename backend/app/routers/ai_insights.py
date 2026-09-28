@@ -25,9 +25,10 @@ async def get_spending_analysis(
     current_user: models.User = Depends(get_current_user),
 ):
     if not start_date:
-        start_date = datetime.now() - timedelta(days=30)
+        start_date = datetime.now() - timedelta(days=90)
     if not end_date:
-        end_date = datetime.now()
+        # Inclusive of "today" even when clients store dates near UTC midnight.
+        end_date = datetime.now() + timedelta(days=1)
 
     transactions = db.query(models.Transaction).filter(
         models.Transaction.user_id == current_user.id,

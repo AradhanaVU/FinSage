@@ -1,21 +1,30 @@
-import { useEffect, useState } from 'react'
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
+import { useCallback, useEffect, useState } from 'react'
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
   AlertCircle,
   Target,
-  ArrowUpRight,
-  ArrowDownRight
 } from 'lucide-react'
-import { 
-  getTransactions, 
-  getGoals, 
+import {
+  getTransactions,
+  getGoals,
   getAlerts,
-  getSpendingAnalysis 
 } from '../services/api'
-import { format, subDays } from 'date-fns'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
+function buildSpendingData(transactions) {
+  const totals = {}
+  for (const txn of transactions) {
+    if (txn.transaction_type !== 'expense') continue
+    const category = txn.category || 'Uncategorized'
+    totals[category] = (totals[category] || 0) + Math.abs(Number(txn.amount) || 0)
+  }
+  return Object.entries(totals)
+    .map(([category, total_amount]) => ({ category, total_amount: Math.round(total_amount * 100) / 100 }))
+    .sort((a, b) => b.total_amount - a.total_amount)
+    .slice(0, 5)
+}
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -28,64 +37,69 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState([])
   const [spendingData, setSpendingData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
-  useEffect(() => {
-    loadDashboardData()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async ({ soft = false } = {}) => {
     try {
-      setLoading(true)
-      
-      // Get transactions
-      const txnResponse = await getTransactions({ limit: 1000 })
-      const transactions = txnResponse.data
+      if (!soft) setLoading(true)
 
-      // Cash identity: Income I, Expenses E, Balance B = I - E.
-      // Amounts are stored signed, so always take magnitude by type.
+      const txnResponse = await getTransactions({ limit: 1000 })
+      const transactions = Array.isArray(txnResponse.data) ? txnResponse.data : []
+
       const income = transactions
-        .filter(t => t.transaction_type === 'income')
+        .filter((t) => t.transaction_type === 'income')
         .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0)
 
       const expenses = transactions
-        .filter(t => t.transaction_type === 'expense')
+        .filter((t) => t.transaction_type === 'expense')
         .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0)
-      
-      // Get goals
+
       const goalsResponse = await getGoals()
-      const goals = goalsResponse.data
+      const goals = Array.isArray(goalsResponse.data) ? goalsResponse.data : []
       const funded = goals.reduce((sum, g) => sum + Math.max(0, Number(g.current_amount) || 0), 0)
       const targeted = goals.reduce((sum, g) => sum + Math.max(0, Number(g.target_amount) || 0), 0)
       const totalProgress = targeted > 0 ? (funded / targeted) * 100 : 0
-      
-      // Get alerts
+
       const alertsResponse = await getAlerts(true)
-      
-      // Get spending analysis
-      const analysisResponse = await getSpendingAnalysis()
-      
+      const alertList = Array.isArray(alertsResponse.data) ? alertsResponse.data : []
+
       setStats({
         totalIncome: income,
         totalExpenses: expenses,
         balance: income - expenses,
         goalProgress: totalProgress,
       })
-      
       setRecentTransactions(transactions.slice(0, 5))
-      setAlerts(alertsResponse.data.slice(0, 3))
-      setSpendingData(analysisResponse.data.slice(0, 5))
-      
+      setAlerts(alertList.slice(0, 3))
+      setSpendingData(buildSpendingData(transactions))
+      setHasLoaded(true)
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  if (loading) {
+  useEffect(() => {
+    loadDashboardData()
+
+    const softRefresh = () => loadDashboardData({ soft: true })
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') softRefresh()
+    }
+
+    window.addEventListener('focus', softRefresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    const interval = setInterval(softRefresh, 15000)
+
+    return () => {
+      window.removeEventListener('focus', softRefresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearInterval(interval)
+    }
+  }, [loadDashboardData])
+
+  if (loading && !hasLoaded) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading dashboard...</div>
@@ -95,60 +109,67 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Income minus expenses across all loaded transactions</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-1">Income minus expenses across all loaded transactions</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => loadDashboardData({ soft: true })}
+          className="shrink-0 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100"
+        >
+          Refresh
+        </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Income"
           value={`$${stats.totalIncome.toFixed(2)}`}
           icon={TrendingUp}
-          trend="up"
           color="green"
         />
         <StatCard
           title="Total Expenses"
           value={`$${stats.totalExpenses.toFixed(2)}`}
           icon={TrendingDown}
-          trend="down"
           color="red"
         />
         <StatCard
           title="Balance"
           value={`$${stats.balance.toFixed(2)}`}
           icon={DollarSign}
-          trend={stats.balance >= 0 ? "up" : "down"}
-          color={stats.balance >= 0 ? "green" : "red"}
+          color={stats.balance >= 0 ? 'green' : 'red'}
         />
         <StatCard
           title="Goal Progress"
           value={`${stats.goalProgress.toFixed(1)}%`}
           icon={Target}
-          trend="up"
           color="blue"
         />
       </div>
 
-      {/* Charts and Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spending by Category */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Spending Categories</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={spendingData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="category" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="total_amount" fill="#0ea5e9" />
-            </BarChart>
-          </ResponsiveContainer>
+          {spendingData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={spendingData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="total_amount" fill="#0ea5e9" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500">
+              No expense categories yet. Add a transaction to see the chart.
+            </div>
+          )}
         </div>
 
-        {/* Recent Transactions */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Transactions</h2>
           <div className="space-y-3">
@@ -173,7 +194,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Alerts */}
       {alerts.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -201,7 +221,7 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ title, value, icon: Icon, trend, color }) {
+function StatCard({ title, value, icon: Icon, color }) {
   const colorClasses = {
     green: 'text-green-600 bg-green-100',
     red: 'text-red-600 bg-red-100',
@@ -222,4 +242,3 @@ function StatCard({ title, value, icon: Icon, trend, color }) {
     </div>
   )
 }
-

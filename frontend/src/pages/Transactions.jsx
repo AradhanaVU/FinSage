@@ -12,12 +12,25 @@ import {
 import { format } from 'date-fns'
 import { categoryClass, money, DEFAULT_CATEGORIES } from '../utils/categories'
 
+function localDateInputValue(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function dateInputToIso(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  // Noon local avoids UTC day-shift for evening users.
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString()
+}
+
 const emptyForm = {
   amount: '',
   description: '',
   transaction_type: 'expense',
   merchant: '',
-  date: new Date().toISOString().split('T')[0],
+  date: localDateInputValue(),
   category: '',
 }
 
@@ -129,14 +142,14 @@ export default function Transactions() {
         description: formData.description,
         transaction_type: formData.transaction_type,
         merchant: formData.merchant || null,
-        date: new Date(formData.date).toISOString(),
+        date: dateInputToIso(formData.date),
       }
       if (formData.category) {
         transactionData.category = formData.category
       }
       await createTransaction(transactionData)
       setShowAddModal(false)
-      setFormData({ ...emptyForm, date: new Date().toISOString().split('T')[0] })
+      setFormData({ ...emptyForm, date: localDateInputValue() })
       setSuggestion(null)
       loadTransactions()
     } catch (error) {
@@ -347,94 +360,107 @@ export default function Transactions() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">Add Transaction</h2>
-            <p className="text-sm text-gray-500 mb-4">Leave category on Auto and we will suggest one. You can always change it later.</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={formData.transaction_type}
-                  onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value, category: '' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="expense">Expense</option>
-                  <option value="income">Income</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">Auto-suggest</option>
-                  {formCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                {!formData.category && suggestion && (
-                  <div className="mt-2 flex items-start gap-2 text-sm bg-primary-50 text-primary-800 rounded-lg p-3">
-                    <Sparkles className="w-4 h-4 mt-0.5 shrink-0" />
-                    <div>
-                      <p>
-                        Suggested <span className="font-semibold">{suggestion.category}</span>
-                        {suggestion.confidence != null && (
-                          <span> ({Math.round(suggestion.confidence * 100)}% confidence)</span>
-                        )}
-                      </p>
-                      {suggestion.matched_phrases?.length > 0 && (
-                        <p className="text-xs text-primary-700 mt-1">
-                          Matched: {suggestion.matched_phrases.slice(0, 3).join(', ')}
-                        </p>
-                      )}
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 pt-6 pb-3 shrink-0">
+              <h2 className="text-2xl font-bold text-gray-900">Add Transaction</h2>
+              <p className="text-sm text-gray-500 mt-1">Leave category on Auto and we will suggest one. You can always change it later.</p>
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+              <div className="px-6 space-y-4 overflow-y-auto flex-1 pb-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <select
+                    value={formData.transaction_type}
+                    onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value, category: '' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Auto-suggest</option>
+                    {formCategories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  {!formData.category && suggestion && (
+                    <div className="mt-2 flex items-start justify-between gap-2 text-sm bg-primary-50 text-primary-800 rounded-lg p-3">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <Sparkles className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p>
+                            Suggested <span className="font-semibold">{suggestion.category}</span>
+                            {suggestion.confidence != null && (
+                              <span> ({Math.round(suggestion.confidence * 100)}% confidence)</span>
+                            )}
+                          </p>
+                          {suggestion.matched_phrases?.length > 0 && (
+                            <p className="text-xs text-primary-700 mt-1 truncate">
+                              Matched: {suggestion.matched_phrases.slice(0, 3).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, category: suggestion.category })}
+                        className="shrink-0 px-3 py-1.5 text-xs font-semibold bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                      >
+                        Confirm
+                      </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Merchant (optional)</label>
+                  <input
+                    type="text"
+                    value={formData.merchant}
+                    onChange={(e) => setFormData({ ...formData, merchant: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input
-                  type="date"
-                  required
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Merchant (optional)</label>
-                <input
-                  type="text"
-                  value={formData.merchant}
-                  onChange={(e) => setFormData({ ...formData, merchant: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
+              <div className="px-6 py-4 border-t border-gray-100 bg-white flex gap-3 shrink-0">
                 <button type="submit" className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   Add Transaction
                 </button>
